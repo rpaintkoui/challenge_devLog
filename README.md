@@ -1,1 +1,1 @@
-# challenge_devLog
+# Repo for the 'DevLog' challenge
