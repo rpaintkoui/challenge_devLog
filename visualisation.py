@@ -1,140 +1,128 @@
 #%%
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-#import cartopy.crs as ccrs
 
 import pandas as pd
+from download import download
 
+# to get the current working dir and change it
+import os
 
+# to create the animation
+import plotly.express as px
+import plotly.graph_objects as go
 
-# %%
+#%% changing the cwd
 
-df = pd.read_csv(‘data_Jour.csv’, names=[‘School’, ‘Grad Date’, ‘Long’, ‘Lat’])
-# convert the graduation date column to datetime objects
-df[‘Grad Date’] = pd.to_datetime(df[‘Grad Date’])
+os.chdir(str(os.getcwd()))
+
+#%% data treatment
+import os
+import glob
+import pandas as pd
+
+extension = 'csv'
+all_filenames = [i for i in glob.glob('*.{}'.format(extension))]
+
+#combine all files in the list
+combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames ])
+#export to csv
+combinedFile = combined_csv.to_csv( "../combined_csv.csv", index=False, encoding='utf-8-sig')
+
+#fichier noms compteurs
+names = pd.read_csv("../noms_compteurs.csv")
+names.columns = [ "name", "serialNumber", "1", "2", "3", "id"]
+names['name'] = ['Tanneurs', 'Berracasa', 'Celleneuve', 'Lavérune', 'Vieille Poste', 'Delmas 1', 'Delmas 2', 'Gerhardt', 'Lattes 2', 'Lattes 1']
+
+#%% downloading datas
+url=""
+os.mkdir("./csv")
+path_target = "./csv/allDatas.csv" 
+download(url, path_target, replace=True) #downloads the file to path_target
+
 #%%
-fig = plt.figure(figsize=(19.2, 10.8))
-ax = plt.axes(projection=ccrs.Mercator(central_longitude=0,  
-                                       min_latitude=-65,
-                                       max_latitude=70))
-#%%
-fig = plt.figure(figsize=(19.2, 10.8))
-ax = plt.axes(projection=ccrs.Mercator(central_longitude=0,  
-                                       min_latitude=-65,
-                                       max_latitude=70))
-# %%
-date = datetime(2017, 12, 31)
-grads = df[df['Grad Date'] <= date]
-# %%
-# Define colors for each school
-colors = {'AI': '#02b3e4',
-          'Aut Sys': '#f95c3c' ,
-          'Business': '#ff5483',
-          'Developers': '#ecc81a'}
-for school, school_data in grads.groupby('School'):
-    
-    grad_counts = school_data.groupby(['Long', 'Lat']).count()
-    
-    # Get lists for longitudes and latitudes of graduates
-    index = list(grad_counts.index)
-    longs = [each[0] for each in index]
-    lats = [each[1] for each in index]
-    sizes = grad_counts['School']*10
-    # The school names are like 'School of AI', remove 'School of '
-    school_name = ' '.join(school.split()[2:])
-    
-    ax.scatter(longs, lats, s=sizes,
-               color=colors[school_name], alpha=0.8,
-               transform=ccrs.PlateCarree())
-# %%
-fontname = 'Open Sans'
-fontsize = 28
-# Positions for the date and grad counter
-date_x = -53
-date_y = -50
-date_spacing = 65
-# Positions for the school labels
-name_x = -70
-name_y = -60      
-name_spacing = {'Developers': 0,
-                'AI': 55,
-                'Business': 1.9*55,
-                'Aut Sys': 3*55}
-# Date text
-ax.text(date_x, date_y, 
-        f"{date.strftime('%b %d, %Y')}", 
-        color='white',
-        fontname=fontname, fontsize=fontsize*1.3,
-        transform=ccrs.PlateCarree())
-# Total grad counts
-ax.text(date_x + date_spacing, date_y, 
-        "GRADUATES", color='white',
-        fontname=fontname, fontsize=fontsize,
-        transform=ccrs.PlateCarree())
-ax.text(date_x + date_spacing*1.7, date_y, 
-        f"{grads.groupby(['Long', 'Lat']).count()['School'].sum()}",
-        color='white', ha='left',
-        fontname=fontname, fontsize=fontsize*1.3,
-        transform=ccrs.PlateCarree())
-for school_name in ['Developers', 'AI', 'Business', 'Aut Sys']:
-    ax.text(name_x + name_spacing[school_name], 
-            name_y, 
-            school_name.upper(), ha='center',
-            fontname=fontname, fontsize=fontsize*1.1,
-            color=colors[school_name],
-            transform=ccrs.PlateCarree())
-# Expands image to fill the figure and cut off margins
-fig.tight_layout(pad=-0.5)
-# %%
-def make_grads_map(date, data, ax=None, resolution='low'):
-    
-    if ax is None:
-        fig = plt.figure(figsize=(19.2, 10.8))
-        ax = plt.axes(projection=ccrs.Mercator(min_latitude=-65,
-                                               max_latitude=70))
-    
-    ax.background_img(name='BM', resolution=resolution)
-    ax.set_extent([-170, 179, -65, 70], crs=ccrs.PlateCarree())
-    grads = data[data['Grad Date'] < date] 
-    
-    ### rest of the code
-start_date = datetime(2017, 1, 1)
-end_date = datetime(2018, 3, 15)
-fig = plt.figure(figsize=(19.2, 10.8))
-ax = plt.axes(projection=ccrs.Mercator(min_latitude=-65,
-                                       max_latitude=70))
-# Generate an image for each day between start_date and end_date
-for ii, days in enumerate(range((end_date - start_date).days)):
-    date = start_date + timedelta(days)
-    ax = make_grads_map(date, df, ax=ax, resolution='full')
-    fig.tight_layout(pad=-0.5)
-    fig.savefig(f"frames/frame_{ii:04d}.png", dpi=100,     
-                frameon=False, facecolor='black')
-    ax.clear()
-# %%
+df = pd.read_csv("../allDatas.csv")
+df = df.drop(columns = ["location/type", "id", "type", "vehicleType", "reversedLane"])
+df.columns = ["intensity", "laneId", "date", "lat", "long"]
+nom = names[['name', 'id']]
+df['name'] = [nom[nom['id'] == df['laneId'][k]]['name'].iloc[0] for k in range(len(df))]
+df["date"] = [df["date"][k][:10] for k in range(len(df))]
+df = df.sort_values(['date'])
 
-def make_grads_map(date, data, ax=None, resolution='low'):
-    
-    if ax is None:
-        fig = plt.figure(figsize=(19.2, 10.8))
-        ax = plt.axes(projection=ccrs.Mercator(min_latitude=-65,
-                                               max_latitude=70))
-    
-    ax.background_img(name='BM', resolution=resolution)
-    ax.set_extent([-170, 179, -65, 70], crs=ccrs.PlateCarree())
-    grads = data[data['Grad Date'] < date] 
-    
-    ### rest of the code
-start_date = datetime(2017, 1, 1)
-end_date = datetime(2018, 3, 15)
-fig = plt.figure(figsize=(19.2, 10.8))
-ax = plt.axes(projection=ccrs.Mercator(min_latitude=-65,
-                                       max_latitude=70))
-# Generate an image for each day between start_date and end_date
-for ii, days in enumerate(range((end_date - start_date).days)):
-    date = start_date + timedelta(days)
-    ax = make_grads_map(date, df, ax=ax, resolution='full')
-    fig.tight_layout(pad=-0.5)
-    fig.savefig(f"frames/frame_{ii:04d}.png", dpi=100,     
-                frameon=False, facecolor='black')
-    ax.clear()
+#%%
+
+fig = px.scatter_geo(df,
+                    lon = df['lat'], 
+                    lat = df['long'], 
+                    size="intensity",
+                    animation_frame = "date",
+                    animation_group = 'laneId', 
+                    hover_name = 'name',
+                    hover_data=list(['intensity', 'date']),
+                    color = 'intensity')
+
+# focus point on MPL
+lat_foc = 43.610769
+lon_foc = 3.876716
+
+fig.update_geos(fitbounds="locations", visible=True, showland = True)
+
+#fig = fig.update_layout(mapbox_style="open-street-map")
+#fig.update_layout_images(visible=True, source = 'https://www.google.com/maps/place/France/@45.8665231,-6.9240942') 
+#fig.update_geos(showland = True)
+
+#
+fig.write_html("./file2.html")
+fig.show()
+# %%
+import plotly.graph_objects as go
+
+fig = go.Figure(go.Scattermapbox(
+    mode = "markers",
+    marker = {'size': 20, 'color': ["cyan"]}))
+
+fig.update_layout(
+    mapbox = {
+        'style': "stamen-terrain",
+        'zoom': 12, 'layers': [{
+            'source': {
+                'type': "FeatureCollection",
+                'features': [{
+                    'type': "Feature",
+                    'geometry': {
+                        'type': "MultiPolygon",
+                    }
+                }]
+            },
+            'type': "fill", 'below': "traces", 'color': "royalblue"}]},
+    margin = {'l':0, 'r':0, 'b':0, 't':0})
+
+fig.show()
+# %%
+import plotly.express as px
+df = px.data.gapminder()
+fig = px.scatter_geo(df, locations="iso_alpha", color="continent",
+                     hover_name="country", size="pop",
+                     animation_frame="year",
+                     projection="equirectangular")
+fig = fig.update_layout(mapbox_style="open-street-map")
+fig.show()
+# %%
+fig = px.scatter_mapbox(df, lat="long", 
+                    lon="lat", 
+                    hover_name="name", 
+                    animation_frame = "date",
+                    animation_group = 'laneId',
+                    hover_data=["intensity", "date"],
+                    color = 'intensity', 
+                    size = 'intensity',
+                    height = 500, 
+                    zoom = 10)
+
+                      
+
+fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+fig.update_layout(mapbox_style="open-street-map")
+#fig.update_geos(fitbounds="locations", visible=True, showland = True)
+fig.write_html("./file2.html")
+
+fig.show()
+# %%
